@@ -6,9 +6,9 @@ import {
   SearchResponseReturnType,
 } from '../interfaces/interfaces';
 import getResult from '../services/fuzzySearchService';
+import { getTransformedUserPaginationInput } from '../services/paginationService';
+import { buildGraphqlResponse } from '../services/responseTransformationService';
 import settingsService from '../services/settingsService';
-import buildGraphqlResponse from '../utils/buildGraphqlResponse';
-import { getTransformedUserPaginationInput } from '../utils/getTransformedGraphqlPaginationInput';
 
 const getCustomTypes = (strapi: Strapi, nexus) => {
   const { service: getService } = strapi.plugin('graphql');

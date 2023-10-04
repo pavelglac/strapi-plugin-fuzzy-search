@@ -91,6 +91,15 @@ export type SearchResponseReturnType = SearchResponseArgs & {
   auth: Record<string, unknown>;
 };
 
+export type PaginationParams = Record<
+  string,
+  {
+    pageSize?: string;
+    page?: string;
+    withCount?: string;
+  }
+> | null;
+
 export interface PaginationArgs {
   page?: number;
   pageSize?: number;
