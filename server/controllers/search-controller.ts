@@ -1,9 +1,9 @@
 import { errors } from '@strapi/utils';
 import { Context } from '../interfaces/interfaces';
 import getResults from '../services/fuzzySearchService';
+import buildRestResponse from '../services/responseTransformationService';
 import settingsService from '../services/settingsService';
-import buildRestResponse from '../utils/buildRestResponse';
-import { validateQueryParams } from '../utils/validateQueryParams';
+import { validateQueryParams } from '../services/validationService';
 
 const { NotFoundError } = errors;
 

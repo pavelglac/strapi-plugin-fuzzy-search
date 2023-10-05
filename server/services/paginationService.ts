@@ -88,7 +88,7 @@ export const getTransformedUserPaginationInput = ({
 };
 
 export const paginateGraphQlResults = (
-  results: Record<string, unknown>[],
+  results: unknown[],
   { limit, start }: PaginationArgs = {}
 ): PaginatedModelResponse => {
   const resultsCopy = [...results];

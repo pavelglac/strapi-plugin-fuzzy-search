@@ -1,8 +1,8 @@
+import { Schema } from '@strapi/types';
 import { sanitize } from '@strapi/utils';
 import { PaginationBaseQuery } from '../config/querySchema';
 import {
   Entity,
-  Model,
   Result,
   ResultsResponse,
   TransformedPagination,
@@ -14,8 +14,11 @@ import {
 
 const { contentAPI } = sanitize;
 
-const sanitizeOutput = (data: any, contentType: Model, auth: any) =>
-  contentAPI.output(data, contentType, { auth });
+const sanitizeOutput = (
+  data: any,
+  contentType: Schema.ContentType,
+  auth: any
+) => contentAPI.output(data, contentType, { auth });
 
 // Destructure search results and return them in appropriate/sanitized format
 export const buildGraphqlResponse = async (
@@ -26,26 +29,18 @@ export const buildGraphqlResponse = async (
   const { service: getService } = strapi.plugin('graphql');
   const { returnTypes } = getService('format');
   const { toEntityResponseCollection } = returnTypes;
-  const { fuzzysortResults, uid } = searchResult;
+  const { fuzzysortResults, schema } = searchResult;
 
   const results = await Promise.all(
-    fuzzysortResults.map(async (fuzzyRes) => {
-      const schema = strapi.getModel(uid);
-
-      const sanitizedEntity: Record<string, unknown> = (await sanitizeOutput(
-        fuzzyRes.obj,
-        schema,
-        auth
-      )) as Record<string, unknown>;
-
-      return sanitizedEntity;
-    })
+    fuzzysortResults.map(
+      async (fuzzyRes) => await contentAPI.output(fuzzyRes.obj, schema, auth)
+    )
   );
 
   const { data: nodes, meta } = paginateGraphQlResults(results, pagination);
   return toEntityResponseCollection(nodes, {
     args: meta,
-    resourceUID: uid,
+    resourceUID: schema.uid,
   });
 };
 
@@ -59,9 +54,7 @@ export const buildRestResponse = async (
 
   for (const res of searchResults) {
     const sanitizeEntry = async (fuzzyRes: Fuzzysort.KeysResult<Entity>) => {
-      const schema = strapi.getModel(res.uid);
-
-      return await sanitizeOutput(fuzzyRes.obj, schema, auth);
+      return await sanitizeOutput(fuzzyRes.obj, res.schema, auth);
     };
 
     const buildSanitizedEntries = async () =>
@@ -70,7 +63,7 @@ export const buildRestResponse = async (
       );
 
     // Since sanitizeOutput returns a promise --> Resolve all promises in async for loop so that results can be awaited correctly
-    resultsResponse[res.schemaInfo.pluralName] = (await Promise.all(
+    resultsResponse[res.schema.info.pluralName] = (await Promise.all(
       await buildSanitizedEntries()
     )) as Record<string, unknown>[];
   }

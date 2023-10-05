@@ -1,26 +1,34 @@
 import fuzzysort from 'fuzzysort';
 import { transliterate } from 'transliteration';
-import {
-  ContentType,
-  Entity,
-  FilteredEntry,
-  Result,
-} from '../interfaces/interfaces';
+import { ContentType, Entry, FuzzySortOptions } from '../interfaces/interfaces';
 import { validateQuery } from './validationService';
 
+const weightScores = (
+  a: readonly Fuzzysort.KeyResult<Entry>[],
+  keys: FuzzySortOptions['keys']
+) => {
+  const weightedScores = keys.map((key, index) => {
+    const weight = key.weight || 0;
+    // return lowest score
+    return a[index] ? +a[index].score + weight : -9999;
+  });
+
+  return Math.max(...weightedScores);
+};
+
 const buildResult = ({
-  model,
+  entries,
+  fuzzysortOptions,
   keys,
   query,
 }: {
-  model: FilteredEntry;
+  entries: Entry[];
+  fuzzysortOptions: FuzzySortOptions;
   keys: string[];
   query: string;
 }) => {
-  const { pluralName } = model.schemaInfo;
-
-  if (model.fuzzysortOptions.characterLimit) {
-    model[pluralName].forEach((entry) => {
+  if (fuzzysortOptions.characterLimit) {
+    entries.forEach((entry) => {
       const entryKeys = Object.keys(entry);
 
       entryKeys.forEach((key) => {
@@ -28,45 +36,38 @@ const buildResult = ({
 
         if (!entry[key]) return;
 
-        entry[key] = entry[key].slice(0, model.fuzzysortOptions.characterLimit);
+        entry[key] = entry[key].slice(0, fuzzysortOptions.characterLimit);
       });
     });
   }
 
-  return {
-    schemaInfo: model.schemaInfo,
-    uid: model.uid,
-    fuzzysortResults: fuzzysort.go<Entity>(query, model[pluralName], {
-      threshold: model.fuzzysortOptions.threshold,
-      limit: model.fuzzysortOptions.limit,
-      keys,
-      scoreFn: (a) =>
-        Math.max(
-          ...model.fuzzysortOptions.keys.map((key, index) =>
-            a[index] ? a[index].score + key.weight : -9999
-          )
-        ),
-    }),
-  };
+  return fuzzysort.go<Entry>(query, entries, {
+    threshold: fuzzysortOptions.threshold,
+    limit: fuzzysortOptions.limit,
+    keys,
+    scoreFn: (a) => weightScores(a, fuzzysortOptions.keys),
+  });
 };
 
 const buildTransliteratedResult = ({
-  model,
+  entries,
+  fuzzysortOptions,
   keys,
   query,
   result,
 }: {
-  model: FilteredEntry;
+  entries: Entry[];
+  fuzzysortOptions: FuzzySortOptions;
   keys: string[];
   query: string;
-  result: Result;
-}): Result => {
-  const { pluralName } = model.schemaInfo;
+  result: Fuzzysort.KeysResults<Entry>;
+}) => {
+  const { keys: fuzzysortKeys, threshold, limit } = fuzzysortOptions;
 
   /**
    * Transliterate relevant fields for the entry
    */
-  model[pluralName].forEach((entry) => {
+  entries.forEach((entry: Record<string, any>) => {
     const entryKeys = Object.keys(entry);
 
     entry.transliterations = {};
@@ -80,25 +81,14 @@ const buildTransliteratedResult = ({
 
   const transliterationKeys = keys.map((key) => `transliterations.${key}`);
 
-  const { uid, schemaInfo, fuzzysortOptions } = model;
+  const transliteratedResult = fuzzysort.go<Entry>(query, entries, {
+    threshold,
+    limit,
+    keys: transliterationKeys,
+    scoreFn: (a) => weightScores(a, fuzzysortKeys),
+  });
 
-  const transliteratedResult: Result = {
-    uid,
-    schemaInfo,
-    fuzzysortResults: fuzzysort.go<Entity>(query, model[pluralName], {
-      threshold: fuzzysortOptions.threshold,
-      limit: fuzzysortOptions.limit,
-      keys: transliterationKeys,
-      scoreFn: (a) =>
-        Math.max(
-          ...fuzzysortOptions.keys.map((key, index) =>
-            a[index] ? a[index].score + key.weight : -9999
-          )
-        ),
-    }),
-  };
-
-  const previousResults = result.fuzzysortResults;
+  const previousResults = result;
 
   if (!previousResults.total) return transliteratedResult;
 
@@ -106,7 +96,7 @@ const buildTransliteratedResult = ({
 
   // In the chance that a transliterated result scores higher than its non-transliterated counterpart,
   // overwrite the original result with the transliterated result and resort the results
-  transliteratedResult.fuzzysortResults.forEach((res) => {
+  transliteratedResult.forEach((res) => {
     const origIndex = previousResults.findIndex(
       (origRes) => origRes.obj.id === res.obj.id && origRes.score <= res.score
     );
@@ -122,36 +112,34 @@ const buildTransliteratedResult = ({
 export default async function getResult(
   contentType: ContentType,
   query: string,
-  filters?: Record<string, unknown>,
+  // Need to type filters as any, as Strapi doesn't expose the Filter type
+  filters?: any,
   locale?: string
 ) {
   const buildFilteredEntry = async () => {
     await validateQuery(contentType, locale);
 
-    const items = await strapi.entityService.findMany(contentType.model.uid, {
+    return (await strapi.entityService.findMany(contentType.uid, {
       ...(filters && { filters }),
       ...(locale && { locale }),
-    });
-
-    return {
-      uid: contentType.uid,
-      modelName: contentType.modelName,
-      schemaInfo: contentType.model.info,
-      transliterate: contentType.transliterate,
-      fuzzysortOptions: contentType.fuzzysortOptions,
-      [contentType.model.info.pluralName]: items,
-    };
+    })) as unknown as Entry[];
   };
 
-  const filteredEntry: FilteredEntry = await buildFilteredEntry();
+  const filteredEntries = await buildFilteredEntry();
 
-  const keys = filteredEntry.fuzzysortOptions.keys.map((key) => key.name);
+  const keys = contentType.fuzzysortOptions.keys.map((key) => key.name);
 
-  let result = buildResult({ model: filteredEntry, keys, query });
+  let result = buildResult({
+    entries: filteredEntries,
+    fuzzysortOptions: contentType.fuzzysortOptions,
+    keys,
+    query,
+  });
 
-  if (filteredEntry.transliterate) {
+  if (contentType.transliterate) {
     result = buildTransliteratedResult({
-      model: filteredEntry,
+      entries: filteredEntries,
+      fuzzysortOptions: contentType.fuzzysortOptions,
       keys,
       query,
       result,

@@ -52,7 +52,7 @@ export const validateQueryParams = async (
 
 export const validateQuery = async (
   contentType: ContentType,
-  locale: string
+  locale?: string
 ) => {
   contentType.fuzzysortOptions.keys.forEach((key) => {
     const attributeKeys = Object.keys(contentType.model.attributes);
