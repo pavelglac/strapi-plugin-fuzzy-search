@@ -1,6 +1,6 @@
 import { Strapi } from '@strapi/strapi';
 import {
-  ModelType,
+  ContentType,
   PaginationArgs,
   SearchResponseArgs,
   SearchResponseReturnType,
@@ -10,7 +10,7 @@ import { getTransformedUserPaginationInput } from '../services/paginationService
 import { buildGraphqlResponse } from '../services/responseTransformationService';
 import settingsService from '../services/settingsService';
 
-const getCustomTypes = (strapi: Strapi, nexus) => {
+const getCustomTypes = (strapi: Strapi, nexus: any) => {
   const { service: getService } = strapi.plugin('graphql');
   const { naming } = getService('utils');
   const { utils } = getService('builders');
@@ -23,10 +23,10 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
   const { transformArgs } = utils;
 
   // Extend the SearchResponse type for each registered model
-  const extendSearchType = (nexus, model: ModelType) => {
+  const extendSearchType = (nexus: any, model: ContentType) => {
     return nexus.extendType({
       type: 'SearchResponse',
-      definition(t) {
+      definition(t: any) {
         t.field(getFindQueryName(model), {
           type: getEntityResponseCollectionName(model),
           args: {
@@ -41,7 +41,7 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
               filters?: Record<string, unknown>;
               locale?: string;
             },
-            ctx,
+            ctx: any,
             auth: Record<string, unknown>
           ) {
             const { query, locale: parentLocaleQuery } = parent;
@@ -72,6 +72,8 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
               (contentType) => contentType.modelName === model.modelName
             );
 
+            if (!contentType) return;
+
             const searchResult = await getResult(
               contentType,
               query,
@@ -81,6 +83,7 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
 
             const resultsResponse = await buildGraphqlResponse(
               searchResult,
+              contentType,
               auth,
               { start: transformedStart, limit: transformedLimit }
             );
@@ -96,7 +99,7 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
 
   const searchResponseType = nexus.extendType({
     type: 'Query',
-    definition(t) {
+    definition(t: any) {
       t.field('search', {
         type: 'SearchResponse',
         args: {
@@ -106,9 +109,9 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
           locale: nexus.stringArg('The locale by which to filter the models'),
         },
         async resolve(
-          _parent,
+          _parent: any,
           args: SearchResponseArgs,
-          ctx
+          ctx: any
         ): Promise<SearchResponseReturnType> {
           const { query, locale } = args;
           const { auth } = ctx.state;
@@ -122,7 +125,7 @@ const getCustomTypes = (strapi: Strapi, nexus) => {
   const returnTypes = [searchResponseType];
 
   contentTypes.forEach((type) => {
-    returnTypes.unshift(extendSearchType(nexus, type.model));
+    returnTypes.unshift(extendSearchType(nexus, type));
   });
 
   return returnTypes;

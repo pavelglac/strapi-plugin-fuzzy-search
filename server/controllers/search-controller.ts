@@ -25,15 +25,18 @@ export default () => ({
         pagination,
         queriedContentTypes
       );
-    } catch (err) {
-      return ctx.badRequest('Invalid query', err.message);
+    } catch (err: any) {
+      return ctx.badRequest(
+        'Invalid query',
+        'message' in err ? err.message : ''
+      );
     }
 
     const queriedContentTypesSet = new Set(queriedContentTypes);
 
     const filteredContentTypes = filtersQuery?.contentTypes
       ? [...contentTypes].filter((contentType) =>
-          queriedContentTypesSet.has(contentType.model.info.pluralName)
+          queriedContentTypesSet.has(contentType.info.pluralName)
         )
       : contentTypes;
 
@@ -43,8 +46,8 @@ export default () => ({
           await getResults(
             contentType,
             query,
-            filtersQuery?.[contentType.model.info.pluralName],
-            filtersQuery?.[contentType.model.info.pluralName]?.locale || locale
+            filtersQuery?.[contentType.info.pluralName],
+            filtersQuery?.[contentType.info.pluralName]?.locale || locale
           )
       )
     );

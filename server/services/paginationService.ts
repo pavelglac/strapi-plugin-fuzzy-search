@@ -80,18 +80,23 @@ export const getTransformedUserPaginationInput = ({
   const { config } = strapi.plugin('graphql');
 
   const pageSize = inputPageSize || config('defaultLimit');
+  const pageNumber = (page || 1) - 1;
 
   return {
-    start: (page - 1) * pageSize || start || undefined,
+    start: pageNumber * (pageSize || 15) || start || undefined,
     limit: pageSize || limit || undefined,
   };
 };
 
 export const paginateGraphQlResults = (
   results: unknown[],
-  { limit, start }: PaginationArgs = {}
+  { limit: limitInput, start: startInput }: PaginationArgs = {}
 ): PaginatedModelResponse => {
+  const { config } = strapi.plugin('graphql');
   const resultsCopy = [...results];
+
+  const start = startInput || 0;
+  const limit = limitInput || config('defaultLimit') || 15;
 
   const data = resultsCopy.slice(start, start + limit);
 

@@ -64,12 +64,6 @@ export type PaginatedResultsResponse<Meta = PaginationMeta> = Record<
   PaginatedModelResponse<Meta>
 >;
 
-export type ModelType = Schema.Schema & {
-  uid: string;
-  responseName: string;
-  modelName: string;
-};
-
 export interface SearchResponseArgs {
   query: string;
   locale?: string;

@@ -2,8 +2,8 @@ import { Schema } from '@strapi/types';
 import { sanitize } from '@strapi/utils';
 import { PaginationBaseQuery } from '../config/querySchema';
 import {
-  Entity,
-  Result,
+  ContentType,
+  Entry,
   ResultsResponse,
   TransformedPagination,
 } from '../interfaces/interfaces';
@@ -22,17 +22,17 @@ const sanitizeOutput = (
 
 // Destructure search results and return them in appropriate/sanitized format
 export const buildGraphqlResponse = async (
-  searchResult: Result,
+  searchResult: Fuzzysort.KeysResults<Entry>,
+  schema: ContentType,
   auth: Record<string, unknown>,
   pagination?: TransformedPagination
 ) => {
   const { service: getService } = strapi.plugin('graphql');
   const { returnTypes } = getService('format');
   const { toEntityResponseCollection } = returnTypes;
-  const { fuzzysortResults, schema } = searchResult;
 
   const results = await Promise.all(
-    fuzzysortResults.map(
+    searchResult.map(
       async (fuzzyRes) => await contentAPI.output(fuzzyRes.obj, schema, auth)
     )
   );
@@ -45,25 +45,24 @@ export const buildGraphqlResponse = async (
 };
 
 export const buildRestResponse = async (
-  searchResults: Result[],
+  searchResults: Fuzzysort.KeysResults<Entry>[],
+  schema: ContentType,
   auth: any,
   pagination: Record<string, PaginationBaseQuery> | null,
-  queriedContentTypes?: string[]
+  queriedContentTypes: string[] | null
 ) => {
   const resultsResponse: ResultsResponse = {};
 
   for (const res of searchResults) {
-    const sanitizeEntry = async (fuzzyRes: Fuzzysort.KeysResult<Entity>) => {
-      return await sanitizeOutput(fuzzyRes.obj, res.schema, auth);
+    const sanitizeEntry = async (fuzzyRes: Fuzzysort.KeysResult<Entry>) => {
+      return await sanitizeOutput(fuzzyRes.obj, schema, auth);
     };
 
     const buildSanitizedEntries = async () =>
-      res.fuzzysortResults.map(
-        async (fuzzyRes) => await sanitizeEntry(fuzzyRes)
-      );
+      res.map(async (fuzzyRes) => await sanitizeEntry(fuzzyRes));
 
     // Since sanitizeOutput returns a promise --> Resolve all promises in async for loop so that results can be awaited correctly
-    resultsResponse[res.schema.info.pluralName] = (await Promise.all(
+    resultsResponse[res.info.pluralName] = (await Promise.all(
       await buildSanitizedEntries()
     )) as Record<string, unknown>[];
   }
