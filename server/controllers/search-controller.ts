@@ -1,5 +1,5 @@
 import { errors } from '@strapi/utils';
-import { Context } from '../interfaces/interfaces';
+import { Context, Result } from '../interfaces/interfaces';
 import getResults from '../services/fuzzySearchService';
 import buildRestResponse from '../services/responseTransformationService';
 import settingsService from '../services/settingsService';
@@ -40,7 +40,7 @@ export default () => ({
         )
       : contentTypes;
 
-    const results = await Promise.all(
+    const results: Result[] = await Promise.all(
       filteredContentTypes.map(
         async (contentType) =>
           await getResults(

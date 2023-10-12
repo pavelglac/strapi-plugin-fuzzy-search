@@ -29,8 +29,8 @@ export interface QueryResult extends ContentType {
 }
 
 export interface Result {
+  fuzzysortResults: Fuzzysort.KeysResults<Entry>;
   schema: Schema.ContentType;
-  fuzzysortResults: Writeable<Fuzzysort.KeysResults<Entry>>;
 }
 
 export interface Entry {

@@ -4,6 +4,7 @@ import { PaginationBaseQuery } from '../config/querySchema';
 import {
   ContentType,
   Entry,
+  Result,
   ResultsResponse,
   TransformedPagination,
 } from '../interfaces/interfaces';
@@ -45,8 +46,7 @@ export const buildGraphqlResponse = async (
 };
 
 export const buildRestResponse = async (
-  searchResults: Fuzzysort.KeysResults<Entry>[],
-  schema: ContentType,
+  searchResults: Result[],
   auth: any,
   pagination: Record<string, PaginationBaseQuery> | null,
   queriedContentTypes: string[] | null
@@ -55,14 +55,16 @@ export const buildRestResponse = async (
 
   for (const res of searchResults) {
     const sanitizeEntry = async (fuzzyRes: Fuzzysort.KeysResult<Entry>) => {
-      return await sanitizeOutput(fuzzyRes.obj, schema, auth);
+      return await sanitizeOutput(fuzzyRes.obj, res.schema, auth);
     };
 
     const buildSanitizedEntries = async () =>
-      res.map(async (fuzzyRes) => await sanitizeEntry(fuzzyRes));
+      res.fuzzysortResults.map(
+        async (fuzzyRes) => await sanitizeEntry(fuzzyRes)
+      );
 
     // Since sanitizeOutput returns a promise --> Resolve all promises in async for loop so that results can be awaited correctly
-    resultsResponse[res.info.pluralName] = (await Promise.all(
+    resultsResponse[res.schema.info.pluralName] = (await Promise.all(
       await buildSanitizedEntries()
     )) as Record<string, unknown>[];
   }

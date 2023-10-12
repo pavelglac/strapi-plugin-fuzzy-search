@@ -1,6 +1,11 @@
 import fuzzysort from 'fuzzysort';
 import { transliterate } from 'transliteration';
-import { ContentType, Entry, FuzzySortOptions } from '../interfaces/interfaces';
+import {
+  ContentType,
+  Entry,
+  FuzzySortOptions,
+  Result,
+} from '../interfaces/interfaces';
 import { validateQuery } from './validationService';
 
 const weightScores = (
@@ -115,7 +120,7 @@ export default async function getResult(
   // Need to type filters as any, as Strapi doesn't expose the Filter type
   filters?: any,
   locale?: string
-) {
+): Promise<Result> {
   const buildFilteredEntry = async () => {
     await validateQuery(contentType, locale);
 
@@ -146,5 +151,8 @@ export default async function getResult(
     });
   }
 
-  return result;
+  return {
+    fuzzysortResults: result,
+    schema: contentType,
+  };
 }
